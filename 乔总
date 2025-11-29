@@ -1,0 +1,1285 @@
+import React, { useState, useEffect, useMemo, useRef } from 'react';
+import { Sparkles, History, RotateCcw, Trash2, Ghost, Crown, X, FileText, BrainCircuit, Dna, ShieldQuestion, Ruler, Star, TrendingDown, Store, Zap, ShoppingBag, AlertTriangle, Snowflake, Flame, Skull, Search, Rocket, Glasses, Hash, Eye, User, Cpu } from 'lucide-react';
+
+// -----------------------------------------------------------------------------
+// Gemini API Logic
+// -----------------------------------------------------------------------------
+const apiKey = ""; // API key injected by environment
+
+const generateCharacterLore = async (item) => {
+  try {
+    const variantName = item.variant ? item.name : item.name + '配色的';
+    const poseDesc = item.pose ? `动作是${item.pose}` : '站得很直';
+    
+    let promptContext = `
+      请为一个叫"乔宇冰"的超Q版软萌小人生成一份简短搞笑的性格档案。
+      外貌特征：像个糯米团子一样圆润，悬浮的手脚，巨大的锅盖头，两个标志性的大鼻孔。穿着${variantName}北面(The North Face)羽绒服。
+      当前状态：${poseDesc}。
+    `;
+
+    if (item.id === 'wang_ge') promptContext += `特殊身份：他是传说中的王哥，吞噬了一切乔宇冰的终极存在，极度危险，长度惊人。`;
+    else if (item.id === 'boss_cool') promptContext += `特殊身份：这甚至不是个人，只是一个巨大的墨镜Emoji，代表了王哥的酷炫分身。`;
+    else if (item.id === 'smic_dad') promptContext += `特殊身份：中芯国际是他爹，浑身散发着芯片和半导体的味道，身价不菲。`;
+    else if (item.rarity === 'god') promptContext += `特殊身份：这是一位互联网概念神，掌管着某种抽象的概念。`;
+    else if (item.rarity === 'ultimate') promptContext += `特殊身份：究极无敌隐藏款，拥有改变现实维度的力量。`;
+    
+    const prompt = `
+      ${promptContext}
+      
+      请严格按照以下 JSON 格式返回内容（不要包含 markdown 代码块标记，直接返回 JSON 字符串）：
+      {
+        "personality": "3-4个字的性格标签，用空格分隔",
+        "hobby": "一个非常离谱的怪癖或爱好",
+        "quote": "一句简短好笑的口头禅",
+        "secret": "关于为什么摆出这个姿势的一个荒谬理由"
+      }
+      确保语气幽默、搞怪、无厘头。
+    `;
+
+    const response = await fetch(
+      `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash-preview-09-2025:generateContent?key=${apiKey}`,
+      {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          contents: [{ parts: [{ text: prompt }] }],
+        }),
+      }
+    );
+
+    if (!response.ok) throw new Error("API call failed");
+    
+    const data = await response.json();
+    const text = data.candidates?.[0]?.content?.parts?.[0]?.text;
+    const jsonString = text.replace(/```json|```/g, '').trim();
+    const parsed = JSON.parse(jsonString);
+    
+    return {
+      personality: String(parsed.personality || "未知生物"),
+      hobby: String(parsed.hobby || "吞噬"),
+      quote: String(parsed.quote || "..."),
+      secret: String(parsed.secret || "无法解析")
+    };
+
+  } catch (error) {
+    console.error("Lore generation failed:", error);
+    return {
+      personality: "信号中断",
+      hobby: "连接母星",
+      quote: "Woc...好卡...",
+      secret: "数据丢失"
+    };
+  }
+};
+
+// -----------------------------------------------------------------------------
+// Data & Constants
+// -----------------------------------------------------------------------------
+
+// 10 God Styles (Meme Gods)
+const GOD_STYLES = {
+  GOD_PURE: { id: 'god_pure', name: '纯爱·战神', variant: 'god_pure', rarity: 'god', hex: '#f472b6', pose: 'shy' },
+  GOD_NTR: { id: 'god_ntr', name: '牛头·酋长', variant: 'god_ntr', rarity: 'god', hex: '#84cc16', pose: 'akimbo' }, 
+  GOD_RUSH: { id: 'god_rush', name: '急急·国王', variant: 'god_rush', rarity: 'god', hex: '#f97316', pose: 'run' },
+  GOD_ROT: { id: 'god_rot', name: '摆烂·之神', variant: 'god_rot', rarity: 'god', hex: '#a8a29e', pose: 'sit' },
+  GOD_FUN: { id: 'god_fun', name: '乐子·真神', variant: 'god_fun', rarity: 'god', hex: '#a855f7', pose: 'cheer' },
+  GOD_KEY: { id: 'god_key', name: '键政·局长', variant: 'god_key', rarity: 'god', hex: '#1e293b', pose: 'proud' },
+  GOD_MCD: { id: 'god_mcd', name: '麦门·信徒', variant: 'god_mcd', rarity: 'god', hex: '#ef4444', pose: 'walk' }, 
+  GOD_KFC: { id: 'god_kfc', name: '疯狂·周四', variant: 'god_kfc', rarity: 'god', hex: '#ef4444', pose: 'wave' },
+  GOD_LUCK: { id: 'god_luck', name: '欧皇·在此', variant: 'god_luck', rarity: 'god', hex: '#fbbf24', pose: 'flex' },
+  GOD_BAD: { id: 'god_bad', name: '非酋·之王', variant: 'god_bad', rarity: 'god', hex: '#000000', pose: 'despair' },
+};
+
+// Ultimate Styles (0.1%)
+const ULTIMATE_STYLES = {
+  GOD: { id: 'god', name: '创世·神', variant: 'ultimate_god', rarity: 'ultimate', hex: '#fffbeb', pose: 'float' },
+  DEVIL: { id: 'devil', name: '深渊·魔', variant: 'ultimate_devil', rarity: 'ultimate', hex: '#450a0a', pose: 'mad' },
+  COSMOS: { id: 'cosmos', name: '时空·主宰', variant: 'ultimate_cosmos', rarity: 'ultimate', hex: '#312e81', pose: 'tpose' },
+  MECHA: { id: 'mecha', name: '机甲·降神', variant: 'ultimate_mecha', rarity: 'ultimate', hex: '#94a3b8', pose: 'flex' },
+  NATURE: { id: 'nature', name: '自然·之灵', variant: 'ultimate_nature', rarity: 'ultimate', hex: '#10b981', pose: 'cheer' },
+  GLITCH: { id: 'glitch', name: '崩坏·领主', variant: 'ultimate_glitch', rarity: 'ultimate', hex: '#000000', pose: 'hacker' },
+  VOID: { id: 'void', name: '虚空·行者', variant: 'ultimate_void', rarity: 'ultimate', hex: '#171717', pose: 'float' },
+  DRAGON: { id: 'dragon', name: '真龙·天子', variant: 'ultimate_dragon', rarity: 'ultimate', hex: '#fbbf24', pose: 'proud' },
+  PHOENIX: { id: 'phoenix', name: '涅槃·凤凰', variant: 'ultimate_phoenix', rarity: 'ultimate', hex: '#f43f5e', pose: 'jump' },
+  TIME: { id: 'time', name: '时间·刺客', variant: 'ultimate_time', rarity: 'ultimate', hex: '#d97706', pose: 'run' },
+};
+
+// Special Styles (6.0%)
+const SPECIAL_STYLES = {
+  SMIC_DAD: { id: 'smic_dad', name: '芯二代·乔', variant: 'smic', rarity: 'supreme', hex: '#0ea5e9', pose: 'proud' }, 
+  WANG_GE: { id: 'wang_ge', name: '王哥·本尊', variant: 'wang_ge', rarity: 'supreme', hex: '#000000', pose: 'dominate' },
+  BOSS_COOL: { id: 'boss_cool', name: '墨镜·王哥', variant: 'boss_cool', rarity: 'supreme', hex: '#000000', pose: 'cool' },
+  
+  WOC_ICE: { id: 'woc_ice', name: 'Woc！冰！', variant: 'woc_ice', rarity: 'mythic', hex: '#bae6fd', pose: 'frozen' },
+  CLASSIC: { id: 'classic', name: '初代·经典', hex: '#e5e5e5', rarity: 'legendary', variant: 'classic', pose: 'proud' },
+  BINGBING: { id: 'bingbing', name: '纯·冰冰', variant: 'bingbing', rarity: 'mythic', hex: '#a5f3fc', pose: 'frozen' },
+  POKEMON: { id: 'pokemon', name: '电击·鼠鼠', variant: 'pokemon', rarity: 'mythic', hex: '#facc15', pose: 'cheer' },
+  STOCK: { id: 'stock', name: '股神·韭菜', variant: 'stock', rarity: 'mythic', hex: '#4ade80', pose: 'despair' },
+  OTAKU: { id: 'otaku', name: '独处·手艺人', variant: 'otaku', rarity: 'mythic', hex: '#fce7f3', pose: 'shake' },
+  ANGRY: { id: 'angry', name: '暴躁·老哥', variant: 'angry', rarity: 'mythic', hex: '#dc2626', pose: 'mad' },
+  CYBER: { id: 'cyber', name: '赛博·2077', variant: 'cyber', rarity: 'hidden', hex: '#00ff00', pose: 'tpose' }, 
+  GHOST: { id: 'ghost', name: '幽灵·飘飘', variant: 'ghost', rarity: 'hidden', hex: '#e5e7eb', pose: 'float' }, 
+  GOLD: { id: 'gold', name: '土豪·24K', variant: 'gold', rarity: 'mythic', hex: '#ffd700', pose: 'flex' },
+  GALAXY: { id: 'galaxy', name: '星空·宇宙', variant: 'galaxy', rarity: 'hidden', hex: '#4338ca', pose: 'float' },
+  MATRIX: { id: 'matrix', name: '黑客·矩阵', variant: 'matrix', rarity: 'hidden', hex: '#000000', pose: 'hacker' },
+  RAINBOW: { id: 'rainbow', name: '彩虹·小马', variant: 'rainbow', rarity: 'mythic', hex: '#ec4899', pose: 'cheer' },
+  INVISIBLE: { id: 'invisible', name: '国王新衣', variant: 'invisible', rarity: 'hidden', hex: '#ffffff', pose: 'idle' },
+
+  // Hidden Variants
+  DOGE: { id: 'doge', name: '修勾·Doge', variant: 'doge', rarity: 'hidden', hex: '#eab308', pose: 'shy' },
+  PEPE: { id: 'pepe', name: '悲伤·蛙蛙', variant: 'pepe', rarity: 'hidden', hex: '#4ade80', pose: 'despair' },
+  BSOD: { id: 'bsod', name: '蓝屏·死机', variant: 'bsod', rarity: 'hidden', hex: '#0000aa', pose: 'dizzy' },
+  PIXEL: { id: 'pixel', name: '像素·8位', variant: 'pixel', rarity: 'hidden', hex: '#14b8a6', pose: 'tpose' },
+  JOKER: { id: 'joker', name: '哥谭·小丑', variant: 'joker', rarity: 'mythic', hex: '#a855f7', pose: 'mad' },
+  BATMAN: { id: 'batman', name: '黑暗·骑士', variant: 'batman', rarity: 'mythic', hex: '#111827', pose: 'proud' },
+  SPIDER: { id: 'spider', name: '彼得·帕克', variant: 'spider', rarity: 'mythic', hex: '#ef4444', pose: 'jump' },
+  CAPTAIN: { id: 'captain', name: '美国·队长', variant: 'captain', rarity: 'mythic', hex: '#2563eb', pose: 'flex' },
+  MINION: { id: 'minion', name: '小黄·人', variant: 'minion', rarity: 'hidden', hex: '#facc15', pose: 'cheer' },
+  SLIME: { id: 'slime', name: '史莱·姆', variant: 'slime', rarity: 'hidden', hex: '#60a5fa', pose: 'sit' },
+  ZOMBIE: { id: 'zombie', name: '行尸·走肉', variant: 'zombie', rarity: 'hidden', hex: '#65a30d', pose: 'walk' },
+  VAMPIRE: { id: 'vampire', name: '暮光·男爵', variant: 'vampire', rarity: 'hidden', hex: '#f3f4f6', pose: 'proud' },
+  NINJA: { id: 'ninja', name: '木叶·隐村', variant: 'ninja', rarity: 'hidden', hex: '#171717', pose: 'run' },
+  ANGEL: { id: 'angel', name: '告死·天使', variant: 'angel', rarity: 'hidden', hex: '#ffffff', pose: 'float' },
+  ROBOT: { id: 'robot', name: '人工·智能', variant: 'robot', rarity: 'hidden', hex: '#94a3b8', pose: 'tpose' },
+  ALIEN: { id: 'alien', name: '火星·来客', variant: 'alien', rarity: 'hidden', hex: '#84cc16', pose: 'wave' },
+  MEDUSA: { id: 'medusa', name: '石化·雕像', variant: 'medusa', rarity: 'hidden', hex: '#78716c', pose: 'frozen' },
+  BLACKHOLE: { id: 'blackhole', name: '黑洞·视界', variant: 'blackhole', rarity: 'mythic', hex: '#000000', pose: 'float' },
+  COLOR_BLACK: { id: 'color_black', name: '五彩·斑斓黑', variant: 'color_black', rarity: 'hidden', hex: '#1f2937', pose: 'idle' },
+  PAPER: { id: 'paper', name: '二向·箔', variant: 'paper', rarity: 'hidden', hex: '#f5f5f4', pose: 'tpose' },
+};
+
+const generatePalettes = () => {
+  const bases = [
+    { id: 'red', name: '火焰红', hex: '#ef4444' }, { id: 'blue', name: '深海蓝', hex: '#3b82f6' },
+    { id: 'green', name: '丛林绿', hex: '#22c55e' }, { id: 'yellow', name: '活力黄', hex: '#eab308' },
+    { id: 'purple', name: '神秘紫', hex: '#a855f7' }, { id: 'pink', name: '猛男粉', hex: '#ec4899' },
+    { id: 'orange', name: '活力橙', hex: '#f97316' }, { id: 'cyan', name: '蒂芙尼', hex: '#06b6d4' },
+    { id: 'grey', name: '水泥灰', hex: '#9ca3af' }, { id: 'black', name: '暗夜黑', hex: '#1f2937' },
+    { id: 'white', name: '纯净白', hex: '#ffffff' },
+    { id: 'tianqing', name: '天青色', hex: '#87CEEB' }, { id: 'yanzhi', name: '胭脂红', hex: '#9d2933' },
+    { id: 'dai', name: '黛蓝', hex: '#41555d' }, { id: 'zhusha', name: '朱砂', hex: '#ff4c00' },
+    { id: 'liuhuang', name: '硫磺', hex: '#e2d849' }, { id: 'feicui', name: '翡翠', hex: '#3de1ad' },
+    { id: 'hupo', name: '琥珀', hex: '#ca6924' }, { id: 'boluo', name: '菠萝黄', hex: '#fc7f03' },
+    { id: 'putao', name: '葡萄紫', hex: '#4b0082' }, { id: 'moshui', name: '墨水蓝', hex: '#00008b' },
+    { id: 'shihu', name: '石户朱', hex: '#ac423e' }, { id: 'qiuxiang', name: '秋香色', hex: '#d9b611' },
+    { id: 'kongque', name: '孔雀绿', hex: '#00a15c' }, { id: 'baoshi', name: '宝石蓝', hex: '#0047ab' },
+    { id: 'salmon', name: '三文鱼', hex: '#ff8c69' }, { id: 'avocado', name: '牛油果', hex: '#568203' },
+    { id: 'egg', name: '咸蛋黄', hex: '#fdb933' }, { id: 'matcha', name: '抹茶', hex: '#b7d28d' },
+    { id: 'choco', name: '黑巧', hex: '#3e2723' }, { id: 'grape', name: '巨峰', hex: '#6f2da8' },
+    { id: 'peach', name: '水蜜桃', hex: '#ffcbca' }, { id: 'coffee', name: '拿铁', hex: '#a0785a' },
+    { id: 'mint', name: '薄荷', hex: '#98ff98' }, { id: 'taro', name: '香芋', hex: '#d6b4fc' },
+    { id: 'lemon', name: '柠檬', hex: '#fff700' }, { id: 'cherry', name: '车厘子', hex: '#590014' },
+    { id: 'lime', name: '青柠', hex: '#32cd32' }, { id: 'cream', name: '奶油', hex: '#fffdd0' },
+    { id: 'cocoa', name: '可可', hex: '#d2691e' }, { id: 'berry', name: '树莓', hex: '#e30b5d' },
+    { id: 'olive', name: '橄榄', hex: '#808000' }, { id: 'wine', name: '勃艮第', hex: '#800020' },
+    { id: 'honey', name: '蜂蜜', hex: '#a98307' }, { id: 'plum', name: '李子', hex: '#8e4585' },
+    { id: 'neon_pink', name: '赛博粉', hex: '#ff00ff' }, { id: 'neon_green', name: '毒液绿', hex: '#39ff14' },
+    { id: 'electric', name: '电光蓝', hex: '#7df9ff' }, { id: 'laser', name: '激光紫', hex: '#bf00ff' },
+    { id: 'metal', name: '重金属', hex: '#333333' }, { id: 'silver', name: '太空银', hex: '#c0c0c0' },
+    { id: 'rosegold', name: '玫瑰金', hex: '#b76e79' }, { id: 'bronze', name: '古铜', hex: '#cd7f32' },
+    { id: 'fog', name: '雾霾蓝', hex: '#93a2ba' }, { id: 'bean', name: '豆沙', hex: '#b36d61' },
+    { id: 'linen', name: '亚麻', hex: '#faf0e6' }, { id: 'khaki', name: '卡其', hex: '#f0e68c' },
+    { id: 'brick', name: '砖红', hex: '#cb4154' }, { id: 'denim', name: '丹宁', hex: '#1560bd' },
+    { id: 'moss', name: '苔藓', hex: '#8a9a5b' }, { id: 'clay', name: '陶土', hex: '#cc7722' },
+  ];
+  return bases;
+};
+
+const PALETTES = generatePalettes();
+const POSES = ['idle', 'wave', 'walk', 'cheer', 'akimbo', 'shy', 'run', 'sit', 'jump', 'dizzy'];
+
+const TOTAL_STYLES_COUNT = Object.keys(ULTIMATE_STYLES).length + Object.keys(SPECIAL_STYLES).length + Object.keys(GOD_STYLES).length + (PALETTES.length * POSES.length); 
+
+const RARITY_CONFIG = {
+  common: { color: 'stone', bg: 'bg-white', text: 'text-stone-600', border: 'border-stone-100', label: '常规' },
+  rare: { color: 'blue', bg: 'bg-blue-50', text: 'text-blue-600', border: 'border-blue-200', label: '稀有' },
+  legendary: { color: 'yellow', bg: 'bg-amber-50', text: 'text-amber-700', border: 'border-amber-200', label: '传说' },
+  mythic: { color: 'red', bg: 'bg-rose-50', text: 'text-rose-700', border: 'border-rose-200', label: '神话' },
+  hidden: { color: 'purple', bg: 'bg-purple-50', text: 'text-purple-700', border: 'border-purple-200', label: '隐藏' },
+  ultimate: { color: 'rainbow', bg: 'bg-black', text: 'text-transparent bg-clip-text bg-gradient-to-r from-red-500 via-yellow-500 to-blue-500', border: 'border-yellow-400', label: '究极·无敌' },
+  god: { color: 'gold', bg: 'bg-yellow-100', text: 'text-yellow-800', border: 'border-yellow-300', label: '玩梗·真神' },
+  supreme: { color: 'black', bg: 'bg-slate-950', text: 'text-red-500', border: 'border-red-900', label: '灭世·魔神' },
+};
+
+// -----------------------------------------------------------------------------
+// Component: QiaoYubing Character
+// -----------------------------------------------------------------------------
+const QiaoYubing = ({ color, variant = 'default', pose = 'idle', scale = 1, animate = true }) => {
+  // Styles
+  let shoulderColor = '#111827'; 
+  let bodyColor = color || '#1f2937';
+  let faceColor = '#fde68a'; 
+  let hairColor = '#1f2937';
+  let mouthColor = '#4b5563';
+  let blushOpacity = 0.6;
+  let opacity = 1;
+  let isUltimate = false;
+
+  // Variant Flags
+  const isAngry = variant === 'angry';
+  const isIce = variant === 'ice'; 
+  const isBingBing = variant === 'bingbing'; 
+  const isWocIce = variant === 'woc_ice';
+  const isPokemon = variant === 'pokemon'; 
+  const isCyber = variant === 'cyber' || variant === 'ultimate_glitch' || variant === 'robot';
+  const isGhost = variant === 'ghost' || variant === 'ultimate_void' || variant === 'angel';
+  const isGold = variant === 'gold' || variant === 'ultimate_dragon';
+  const isGalaxy = variant === 'galaxy' || variant === 'ultimate_cosmos' || variant === 'blackhole';
+  const isMatrix = variant === 'matrix';
+  const isRainbow = variant === 'rainbow' || variant === 'color_black';
+  const isClassic = variant === 'classic';
+  const isStock = variant === 'stock';
+  const isOtaku = variant === 'otaku';
+  const isWangGe = variant === 'wang_ge';
+  const isBossCool = variant === 'boss_cool';
+  const isDoge = variant === 'doge';
+  const isPepe = variant === 'pepe';
+  const isBsod = variant === 'bsod';
+  const isPixel = variant === 'pixel';
+  const isJoker = variant === 'joker';
+  const isBatman = variant === 'batman';
+  const isSpider = variant === 'spider';
+  const isCaptain = variant === 'captain';
+  const isMinion = variant === 'minion';
+  const isSlime = variant === 'slime';
+  const isZombie = variant === 'zombie';
+  const isVampire = variant === 'vampire';
+  const isNinja = variant === 'ninja';
+  const isAngel = variant === 'angel';
+  const isRobot = variant === 'robot';
+  const isSmic = variant === 'smic';
+  const isGodMcd = variant === 'god_mcd';
+  const isGodKfc = variant === 'god_kfc';
+  const isGodPure = variant === 'god_pure';
+  const isGodNtr = variant === 'god_ntr';
+  const isGodRush = variant === 'god_rush';
+  const isGodRot = variant === 'god_rot';
+  const isGodFun = variant === 'god_fun';
+  const isGodKey = variant === 'god_key';
+  const isGodLuck = variant === 'god_luck';
+  const isGodBad = variant === 'god_bad';
+
+  if (variant && variant.startsWith('ultimate')) {
+    isUltimate = true;
+    shoulderColor = '#000';
+    if (variant === 'ultimate_god') { bodyColor = 'url(#godGradient)'; faceColor = '#fffbe6'; hairColor = '#fbbf24'; }
+    if (variant === 'ultimate_devil') { bodyColor = '#450a0a'; faceColor = '#fca5a5'; hairColor = '#000'; shoulderColor = '#7f1d1d'; }
+    if (variant === 'ultimate_nature') { bodyColor = '#064e3b'; faceColor = '#d1fae5'; hairColor = '#065f46'; }
+    if (variant === 'ultimate_mecha') { bodyColor = '#1e293b'; faceColor = '#e2e8f0'; hairColor = '#94a3b8'; shoulderColor = '#475569'; }
+    if (variant === 'ultimate_phoenix') { bodyColor = 'url(#goldGradientBody)'; faceColor = '#fff1f2'; hairColor = '#f43f5e'; }
+  }
+
+  // --- Specific Style Overrides ---
+  if (isWangGe || isBossCool) { bodyColor = '#020617'; faceColor = '#e2e8f0'; hairColor = '#000'; shoulderColor = '#991b1b'; mouthColor = '#ef4444'; blushOpacity = 0; }
+  if (isWocIce) { bodyColor = '#bae6fd'; faceColor = '#e0f2fe'; blushOpacity = 0.8; mouthColor = '#0ea5e9'; }
+  if (isAngry || isGodRush) { bodyColor = '#ef4444'; faceColor = '#fca5a5'; blushOpacity = 0; }
+  if (isStock || isPepe || isGodNtr) { bodyColor = '#22c55e'; faceColor = '#dcfce7'; mouthColor = '#15803d'; }
+  if (isOtaku || isGodPure) { bodyColor = '#fce7f3'; faceColor = '#fecdd3'; blushOpacity = 0.9; }
+  if (isCyber) { bodyColor = '#0f172a'; faceColor = '#e2e8f0'; hairColor = '#000'; blushOpacity = 0; }
+  if (isGhost) { bodyColor = 'rgba(255,255,255,0.6)'; faceColor = 'rgba(255,255,255,0.8)'; hairColor = 'rgba(229,231,235,0.8)'; shoulderColor = 'rgba(255,255,255,0.4)'; blushOpacity = 0.1; }
+  if (isGold) { bodyColor = 'url(#goldGradientBody)'; faceColor = '#fef3c7'; shoulderColor = '#b45309'; }
+  if (isGalaxy) { bodyColor = 'url(#galaxyGradient)'; faceColor = '#e0e7ff'; shoulderColor = '#1e1b4b'; }
+  if (isMatrix) { bodyColor = '#000'; faceColor = '#ccffcc'; shoulderColor = '#003300'; hairColor = '#002200'; }
+  if (isRainbow) { bodyColor = 'url(#rainbowGradient)'; faceColor = '#fff0f5'; }
+  if (isPokemon) { bodyColor = '#facc15'; faceColor = '#facc15'; hairColor = '#facc15'; shoulderColor = '#ca8a04'; blushOpacity = 1; }
+  if (variant === 'invisible') opacity = 0.1;
+  // New Variants
+  if (isDoge) { bodyColor = '#eab308'; faceColor = '#fde047'; hairColor = '#a16207'; }
+  if (isBsod) { bodyColor = '#0000aa'; faceColor = '#0000aa'; hairColor = '#0000aa'; }
+  if (isJoker || isGodFun) { bodyColor = '#a855f7'; faceColor = '#ffffff'; hairColor = '#22c55e'; mouthColor = '#ef4444'; }
+  if (isBatman || isGodBad) { bodyColor = '#111827'; faceColor = '#e5e7eb'; hairColor = '#000'; shoulderColor = '#000'; }
+  if (isSpider || isGodMcd || isGodKfc) { bodyColor = '#ef4444'; faceColor = '#ef4444'; hairColor = '#ef4444'; shoulderColor = '#3b82f6'; }
+  if (isCaptain || isSmic) { bodyColor = '#2563eb'; faceColor = '#e5e7eb'; hairColor = '#2563eb'; shoulderColor = '#ef4444'; }
+  if (isMinion) { bodyColor = '#facc15'; faceColor = '#facc15'; hairColor = '#facc15'; shoulderColor = '#2563eb'; }
+  if (isSlime) { bodyColor = 'rgba(96, 165, 250, 0.7)'; faceColor = 'rgba(96, 165, 250, 0.7)'; hairColor = 'rgba(96, 165, 250, 0.7)'; }
+  if (isZombie) { bodyColor = '#65a30d'; faceColor = '#d9f99d'; hairColor = '#365314'; }
+  if (isVampire) { bodyColor = '#000'; faceColor = '#f3f4f6'; hairColor = '#000'; }
+  if (isNinja) { bodyColor = '#171717'; faceColor = '#fca5a5'; hairColor = '#000'; }
+  if (isGodRot) { bodyColor = '#a8a29e'; faceColor = '#e5e5e5'; hairColor = '#78716c'; }
+  if (isGodLuck) { bodyColor = '#fbbf24'; faceColor = '#fef3c7'; hairColor = '#d97706'; }
+
+  // Pose Transforms 
+  let leftHandX = 65, leftHandY = 120;
+  let rightHandX = 135, rightHandY = 120;
+  let leftFootX = 85, leftFootY = 175;
+  let rightFootX = 115, rightFootY = 175;
+  let bodyY = 0;
+  let headY = 0;
+  let eyesType = 'normal';
+  
+  switch(pose) {
+    case 'wave': leftHandY = 80; leftHandX = 55; break;
+    case 'cheer': leftHandY = 70; rightHandY = 70; bodyY = -5; eyesType = 'happy'; break;
+    case 'akimbo': leftHandX = 75; rightHandX = 125; leftHandY = 130; rightHandY = 130; break; 
+    case 'run': leftHandY = 110; rightHandY = 130; leftFootY = 165; rightFootY = 185; bodyY = -3; break;
+    case 'walk': leftHandY = 115; rightHandY = 125; leftFootX = 80; rightFootX = 120; bodyY = -1; break;
+    case 'mad': leftHandY = 100; rightHandY = 100; leftHandX = 55; rightHandX = 145; eyesType = 'angry'; break;
+    case 'despair': leftHandY = 80; rightHandY = 80; leftHandX = 90; rightHandX = 110; eyesType = 'dead'; break; 
+    case 'shake': rightHandY = 130; rightHandX = 100; leftHandX = 65; leftHandY = 130; eyesType = 'dizzy'; break; 
+    case 'flex': leftHandY = 80; rightHandY = 80; leftHandX = 55; rightHandX = 145; break;
+    case 'shy': leftHandY = 90; rightHandY = 90; leftHandX = 90; rightHandX = 110; headY = 2; eyesType = 'closed'; break;
+    case 'proud': leftHandY = 130; rightHandY = 130; headY = -2; break;
+    case 'frozen': eyesType = 'closed'; break;
+    case 'tpose': leftHandY = 100; rightHandY = 100; leftHandX = 40; rightHandX = 160; break;
+    case 'jump': bodyY = -15; leftHandY = 70; rightHandY = 70; leftFootY = 165; rightFootY = 165; break;
+    case 'sit': bodyY = 10; leftFootY = 170; rightFootY = 170; leftFootX = 70; rightFootX = 130; break;
+    case 'dominate': leftHandY = 140; rightHandY = 140; bodyY = -10; break; 
+    default: break; 
+  }
+
+  if (isAngry || variant === 'ultimate_devil') eyesType = 'angry';
+  if (isCyber || variant === 'ultimate_glitch') eyesType = 'cyber';
+  if (isGhost || variant === 'ultimate_void') eyesType = 'normal';
+  if (isStock) eyesType = 'dead';
+  if (isOtaku || isBsod) eyesType = 'dizzy';
+  if (isPokemon || isMinion || isGodFun || isGodLuck) eyesType = 'happy';
+  if (isWocIce) eyesType = 'shocked';
+  if (isWangGe || isVampire || isJoker || isGodKey) eyesType = 'evil';
+  if (isBossCool) eyesType = 'cool'; 
+  if (isPepe || isGodBad) eyesType = 'sad';
+
+  const renderDefs = () => (
+    <defs>
+      <linearGradient id="goldGradientBody" x1="0%" y1="0%" x2="100%" y2="100%">
+        <stop offset="0%" stopColor="#fcd34d" /><stop offset="100%" stopColor="#d97706" />
+      </linearGradient>
+      <linearGradient id="godGradient" x1="0%" y1="0%" x2="100%" y2="100%">
+        <stop offset="0%" stopColor="#ffffff" /><stop offset="100%" stopColor="#fef3c7" />
+      </linearGradient>
+      <linearGradient id="galaxyGradient" x1="0%" y1="0%" x2="100%" y2="100%">
+        <stop offset="0%" stopColor="#4338ca" /><stop offset="100%" stopColor="#be185d" />
+      </linearGradient>
+      <linearGradient id="rainbowGradient" x1="0%" y1="0%" x2="100%" y2="0%">
+        <stop offset="0%" stopColor="#ff0000" /><stop offset="50%" stopColor="#00ff00" /><stop offset="100%" stopColor="#0000ff" />
+      </linearGradient>
+      <filter id="iceBlur"><feGaussianBlur stdDeviation="3" /></filter>
+      <filter id="pixelate" x="0" y="0">
+        <feFlood x="2" y="2" height="2" width="2"/>
+        <feComposite width="4" height="4"/>
+        <feTile result="a"/>
+        <feComposite in="SourceGraphic" in2="a" operator="in"/>
+        <feMorphology operator="dilate" radius="2"/>
+      </filter>
+    </defs>
+  );
+
+  if (isBingBing) {
+    return (
+      <div className={`relative flex flex-col items-center justify-end transition-all duration-500 select-none ${animate ? 'animate-pulse-slow' : ''}`} style={{ transform: `scale(${scale})` }}>
+        <svg width="200" height="220" viewBox="0 0 200 220">
+          <rect x="50" y="60" width="100" height="120" rx="10" fill="rgba(165, 243, 252, 0.6)" stroke="#06b6d4" strokeWidth="3" />
+          <path d="M60 70 L90 100 M140 170 L110 140" stroke="white" strokeWidth="3" opacity="0.8" />
+          <g opacity="0.5">
+             <circle cx="85" cy="100" r="4" fill="#155e75" />
+             <circle cx="115" cy="100" r="4" fill="#155e75" />
+             <path d="M95 120 Q100 115 105 120" stroke="#155e75" strokeWidth="2" fill="none" />
+          </g>
+        </svg>
+        <div className="absolute bottom-4 text-xs font-bold text-cyan-600 bg-white/80 px-2 rounded">BING BING</div>
+      </div>
+    );
+  }
+
+  // --- Boss Cool (Emoji Mode) ---
+  if (isBossCool) {
+     return (
+       <div className={`relative flex flex-col items-center justify-center transition-all duration-500 select-none ${animate ? 'animate-bounce-gentle' : ''}`} style={{ transform: `scale(${scale})` }}>
+          <div style={{ fontSize: '120px', lineHeight: 1 }}>😎</div>
+          <div className="absolute bottom-[-20px] text-xs font-black bg-black text-white px-2 py-1 rounded">BOSS COOL</div>
+       </div>
+     );
+  }
+
+  let animClass = '';
+  if (animate) {
+    if (isAngry || isWocIce || isJoker || isGodRush) animClass = 'animate-shake-hard';
+    else if (isGhost || isGalaxy || variant === 'ultimate_god' || isSlime || isAngel) animClass = 'animate-float';
+    else if (isOtaku) animClass = 'animate-shake-vertical';
+    else if (pose === 'run' || isNinja) animClass = 'animate-bounce-fast';
+    else if (pose === 'walk' || isZombie) animClass = 'animate-sway';
+    else if (isStock) animClass = 'animate-pulse';
+    else if (isPokemon) animClass = 'animate-bounce-gentle';
+    else if (isUltimate || isBossCool) animClass = 'animate-pulse-slow';
+    else if (pose === 'cheer' || pose === 'jump') animClass = 'animate-bounce-gentle';
+    else animClass = ['animate-breathe', 'animate-sway-slow', 'animate-wiggle'][Math.floor(Math.random() * 3)];
+  }
+
+  return (
+    <div 
+      className={`relative flex flex-col items-center justify-end transition-all duration-500 select-none ${animClass}`}
+      style={{ transform: `scale(${scale})`, opacity }}
+    >
+      {isGalaxy && <div className="absolute inset-0 bg-transparent z-20 pointer-events-none"><Sparkles className="absolute top-0 left-2 w-3 h-3 text-white animate-pulse" /></div>}
+      {(isGold || isUltimate || isBossCool || isGodLuck) && <div className="absolute -top-4 -right-4 w-5 h-5 text-yellow-400 animate-spin-slow"><Star fill="currentColor" /></div>}
+      {isClassic && <div className="absolute -inset-10 bg-yellow-400/10 blur-xl rounded-full z-0 animate-pulse-slow"></div>}
+      {isStock && <div className="absolute inset-0 z-0 opacity-30"><TrendingDown className="w-10 h-10 text-green-600 absolute top-0 right-0 animate-bounce" /></div>}
+      {(isPokemon || isMinion) && <div className="absolute -top-6 right-0 z-20"><Zap className="w-6 h-6 text-yellow-500 animate-ping" /></div>}
+      {isOtaku && <div className="absolute bottom-20 right-10 z-20"><div className="bg-white border border-stone-200 rounded w-5 h-4 shadow-sm relative"><div className="absolute -top-2 left-1/2 -translate-x-1/2 w-3 h-3 bg-white rotate-45 rounded-sm"></div></div></div>}
+      {isWocIce && <div className="absolute top-0 right-0 text-cyan-500 font-black animate-bounce">WOC! ❄️</div>}
+      {(isWangGe || isBossCool) && <div className="absolute -inset-10 bg-red-900/30 blur-2xl rounded-full z-0 animate-pulse"></div>}
+      {isAngel && <div className="absolute -top-8 left-1/2 -translate-x-1/2 w-12 h-4 border-4 border-yellow-200 rounded-[50%] animate-float"></div>}
+      {isBsod && <div className="absolute top-10 left-4 text-[6px] text-white font-mono opacity-50">:( <br/>FATAL<br/>ERROR</div>}
+      {isSmic && <div className="absolute inset-0 z-20 opacity-30 pointer-events-none"><Cpu className="w-full h-full text-white animate-pulse" /></div>}
+
+      <svg width="200" height="220" viewBox="0 0 200 220" xmlns="http://www.w3.org/2000/svg" className={`z-10 drop-shadow-xl ${isIce ? 'drop-shadow-blue-300' : ''}`} style={isPixel ? {imageRendering: 'pixelated'} : {}}>
+        {renderDefs()}
+        
+        {(!isGhost && !isSlime) && <ellipse cx="100" cy="200" rx="35" ry="5" fill="#000" opacity="0.1" className="transition-all duration-300" />}
+
+        <g transform={`translate(0, ${bodyY})`}>
+          {(!isGhost && !isSlime) && (
+             <g>
+                <circle cx={leftFootX} cy={leftFootY} r="10" fill={(isWangGe || isBatman || isNinja || isBossCool || isGodKey) ? "#000" : isSpider ? "#ef4444" : "#374151"} />
+                <circle cx={rightFootX} cy={rightFootY} r="10" fill={(isWangGe || isBatman || isNinja || isBossCool || isGodKey) ? "#000" : isSpider ? "#ef4444" : "#374151"} />
+             </g>
+          )}
+          {(isGhost || isSlime) && (
+             <path d="M70 160 Q60 200 100 210 Q140 200 130 160" fill={bodyColor} opacity="0.6" />
+          )}
+
+          <circle cx={leftHandX} cy={leftHandY} r="9" fill={isBatman ? "#000" : isSpider ? "#ef4444" : faceColor} stroke="rgba(0,0,0,0.1)" />
+          <circle cx={rightHandX} cy={rightHandY} r="9" fill={isBatman ? "#000" : isSpider ? "#ef4444" : faceColor} stroke="rgba(0,0,0,0.1)" />
+          
+          <g transform="translate(0, 95)">
+             <rect x="60" y="0" width="80" height="70" rx="30" ry="30" 
+               fill={bodyColor} 
+               stroke={isCyber || isMatrix || isSmic ? "#00ff00" : isClassic ? "#d4d4d4" : "rgba(0,0,0,0.05)"}
+               strokeWidth={isCyber || isSmic ? 1.5 : 1}
+             />
+             {isPixel && <rect x="60" y="0" width="80" height="70" fill="none" stroke="black" strokeWidth="2" strokeDasharray="4,4" />}
+             
+             <path d="M65 25 Q100 30 135 25" stroke="rgba(0,0,0,0.1)" strokeWidth="1.5" fill="none" />
+             <path d="M65 50 Q100 55 135 50" stroke="rgba(0,0,0,0.1)" strokeWidth="1.5" fill="none" />
+             <path d="M60 30 L60 25 A 30 30 0 0 1 140 25 L140 30 Q100 40 60 30 Z" fill={shoulderColor} />
+             {isClassic && (
+               <g transform="translate(120, 10) scale(0.25)">
+                 <path d="M20 0 A 20 20 0 0 1 20 10 L 10 10 A 10 10 0 0 0 10 0 Z" fill="white" />
+                 <path d="M25 -5 A 25 25 0 0 1 25 15 L 22 15 A 22 22 0 0 0 22 -5 Z" fill="white" />
+                 <path d="M30 -10 A 30 30 0 0 1 30 20 L 27 20 A 27 27 0 0 0 27 -10 Z" fill="white" />
+               </g>
+             )}
+             {isPokemon && <path d="M140 40 L160 20 L160 30 L180 10" stroke="#ca8a04" strokeWidth="3" fill="none" />}
+             {(isCaptain || isGodKfc || isGodMcd) && (
+               <circle cx="100" cy="35" r="10" fill="white" stroke="#ef4444" strokeWidth="3" /> 
+             )}
+             {isBatman && <path d="M80 30 L100 40 L120 30 L100 50 Z" fill="black" opacity="0.3" />} 
+             {isSpider && <path d="M90 30 L110 30 M100 20 L100 40" stroke="black" strokeWidth="1" />} 
+          </g>
+
+          <g transform={`translate(0, ${headY})`}>
+            <circle cx="100" cy="55" r="45" fill={faceColor} stroke={isCyber ? "#00ff00" : "none"} strokeWidth={isCyber ? 1 : 0} />
+            
+            {(isBatman || isNinja || isGodKey) && <path d="M55 55 L145 55 L145 40 Q100 -10 55 40 Z" fill="#000" />}
+            {isSpider && (
+               <g>
+                 <path d="M55 55 Q100 20 145 55" stroke="black" strokeWidth="0.5" fill="none" />
+                 <path d="M100 10 L100 100" stroke="black" strokeWidth="0.5" />
+                 <path d="M55 55 L145 55" stroke="black" strokeWidth="0.5" />
+               </g>
+            )}
+
+            {isPokemon ? (
+               <path d="M55 50 Q100 -20 145 50 L140 40 Q100 -25 60 40 Z" fill={hairColor} /> 
+            ) : !isBatman && !isSpider && !isNinja && !isCaptain && !isGodKey ? (
+               <path d="M55 50 Q100 -10 145 50 L147 40 Q100 -25 53 40 Z" fill={hairColor} />
+            ) : null}
+            {(isCaptain || isGodMcd || isGodKfc) && <path d="M55 50 Q100 -10 145 50 L147 45 Q100 -15 53 45 Z" fill="#ef4444" />} 
+            
+            <g transform="translate(0, 10)">
+              {!isSpider && !isBatman && (
+                <>
+                  <ellipse cx="94" cy="62" rx="3" ry="4" fill="#1f2937" opacity={isGhost ? 0.6 : 0.9} />
+                  <ellipse cx="106" cy="62" rx="3" ry="4" fill="#1f2937" opacity={isGhost ? 0.6 : 0.9} />
+                </>
+              )}
+              
+              {eyesType === 'angry' ? (
+                 <g stroke="#1f2937" strokeWidth="2.5" strokeLinecap="round">
+                   <path d="M80 40 L90 45" /> <path d="M120 40 L110 45" />
+                   <circle cx="85" cy="48" r="3" fill="#1f2937" stroke="none" />
+                   <circle cx="115" cy="48" r="3" fill="#1f2937" stroke="none" />
+                 </g>
+              ) : eyesType === 'happy' ? (
+                 <g fill="none" stroke="#1f2937" strokeWidth="2.5" strokeLinecap="round">
+                   <path d="M80 45 Q85 40 90 45" />
+                   <path d="M110 45 Q115 40 120 45" />
+                 </g>
+              ) : eyesType === 'closed' ? (
+                 <g fill="none" stroke="#1f2937" strokeWidth="2" strokeLinecap="round">
+                   <path d="M80 45 L90 45" />
+                   <path d="M110 45 L120 45" />
+                 </g>
+              ) : eyesType === 'dead' ? (
+                 <g stroke="#1f2937" strokeWidth="2">
+                   <path d="M82 42 L88 48 M88 42 L82 48" />
+                   <path d="M112 42 L118 48 M118 42 L112 48" />
+                 </g>
+              ) : eyesType === 'shocked' ? (
+                 <g stroke="#1f2937" strokeWidth="2" fill="white">
+                   <circle cx="85" cy="45" r="5" />
+                   <circle cx="115" cy="45" r="5" />
+                   <circle cx="85" cy="45" r="1" fill="#1f2937" />
+                   <circle cx="115" cy="45" r="1" fill="#1f2937" />
+                 </g>
+              ) : eyesType === 'dizzy' ? (
+                 <g stroke="#1f2937" strokeWidth="2" fill="none">
+                   <circle cx="85" cy="45" r="3" />
+                   <circle cx="115" cy="45" r="3" />
+                   <path d="M85 45 L85 43" /> <path d="M115 45 L115 43" />
+                 </g>
+              ) : eyesType === 'evil' ? (
+                 <g stroke="#ef4444" strokeWidth="2">
+                   <path d="M80 42 L90 48" /> <path d="M120 42 L110 48" />
+                   <circle cx="85" cy="50" r="2" fill="#ef4444" />
+                   <circle cx="115" cy="50" r="2" fill="#ef4444" />
+                 </g>
+              ) : eyesType === 'sad' ? (
+                 <g stroke="#1f2937" strokeWidth="2" fill="none">
+                   <path d="M80 48 Q85 42 90 48" />
+                   <path d="M110 48 Q115 42 120 48" />
+                   <circle cx="85" cy="52" r="2" fill="#1f2937" stroke="none"/>
+                   <circle cx="115" cy="52" r="2" fill="#1f2937" stroke="none"/>
+                 </g>
+              ) : eyesType === 'cool' ? (
+                 <g>
+                   <path d="M70 40 L130 40 L125 55 L105 55 L100 45 L95 55 L75 55 Z" fill="black" />
+                   <line x1="70" y1="42" x2="60" y2="38" stroke="black" strokeWidth="2" />
+                   <line x1="130" y1="42" x2="140" y2="38" stroke="black" strokeWidth="2" />
+                   <path d="M75 42 L85 42 L80 50 Z" fill="white" opacity="0.3" />
+                 </g>
+              ) : eyesType === 'cyber' ? (
+                 <g>
+                    <rect x="75" y="42" width="20" height="6" fill="#00ff00" opacity="0.9" />
+                    <rect x="105" y="42" width="20" height="6" fill="#00ff00" opacity="0.9" />
+                 </g>
+              ) : (
+                 <g>
+                   {isBatman || isNinja || isGodKey ? (
+                     <>
+                        <path d="M80 45 L90 45 L85 50 Z" fill="white" />
+                        <path d="M110 45 L120 45 L115 50 Z" fill="white" />
+                     </>
+                   ) : isSpider ? (
+                     <>
+                        <path d="M80 40 Q95 40 90 55 Q75 55 80 40" fill="white" stroke="black" />
+                        <path d="M120 40 Q105 40 110 55 Q125 55 120 40" fill="white" stroke="black" />
+                     </>
+                   ) : (
+                     <>
+                        <circle cx="85" cy="45" r="3.5" fill="#1f2937" />
+                        <circle cx="115" cy="45" r="3.5" fill="#1f2937" />
+                        {!isMatrix && <circle cx="87" cy="43" r="1" fill="white" />}
+                        {!isMatrix && <circle cx="117" cy="43" r="1" fill="white" />}
+                     </>
+                   )}
+                 </g>
+              )}
+
+              {!isBatman && !isSpider && !isNinja && !isRobot && !isGodKey && (
+                 isPokemon ? (
+                   <g>
+                     <circle cx="72" cy="62" r="6" fill="#ef4444" opacity="0.8" />
+                     <circle cx="128" cy="62" r="6" fill="#ef4444" opacity="0.8" />
+                   </g>
+                 ) : (
+                   <g>
+                     <ellipse cx="75" cy="60" rx="5" ry="2.5" fill="#fb7185" opacity={blushOpacity} />
+                     <ellipse cx="125" cy="60" rx="5" ry="2.5" fill="#fb7185" opacity={blushOpacity} />
+                   </g>
+                 )
+              )}
+
+              {isAngry || isWangGe || isBossCool || isJoker ? (
+                <path d="M92 78 Q100 85 108 78" fill="none" stroke={mouthColor} strokeWidth="2.5" strokeLinecap="round" />
+              ) : pose === 'cheer' || isPokemon || isMinion ? (
+                 <path d="M94 75 Q100 85 106 75 Z" fill="#374151" />
+              ) : isStock || isPepe ? (
+                 <path d="M92 80 Q100 75 108 80" fill="none" stroke={mouthColor} strokeWidth="2" strokeLinecap="round" />
+              ) : isWocIce ? (
+                 <ellipse cx="100" cy="80" rx="6" ry="8" fill="none" stroke={mouthColor} strokeWidth="2.5" />
+              ) : isSpider || isBatman || isNinja ? (
+                 null 
+              ) : (
+                <path d="M94 75 Q100 82 106 75" fill="none" stroke={mouthColor} strokeWidth="2.5" strokeLinecap="round" />
+              )}
+            </g>
+          </g>
+        </g>
+
+        {isIce && (
+           <path d="M30 20 L170 30 L180 200 L20 210 Z" fill="rgba(165, 243, 252, 0.4)" stroke="#a5f3fc" strokeWidth="2" style={{ backdropFilter: 'blur(3px)' }} />
+        )}
+      </svg>
+    </div>
+  );
+};
+
+// -----------------------------------------------------------------------------
+// Component: Collection Item
+// -----------------------------------------------------------------------------
+const CollectionItem = ({ item, onClick }) => {
+  const config = (item && item.rarity && RARITY_CONFIG[item.rarity]) ? RARITY_CONFIG[item.rarity] : RARITY_CONFIG.common;
+
+  if (!item) return null;
+
+  return (
+    <div 
+      onClick={() => onClick(item)}
+      className={`
+        relative group rounded-[20px] p-2 transition-all duration-300 hover:-translate-y-1 cursor-pointer
+        ${config.bg} border ${config.border} hover:shadow-[0_8px_20px_-8px_rgba(0,0,0,0.15)]
+        overflow-hidden flex flex-col items-center justify-between
+      `}
+    >
+      <div className={`absolute top-2 right-2 z-20 text-[8px] font-black px-1.5 py-0.5 rounded-full bg-white/90 text-stone-800 shadow-sm border border-stone-100`}>
+        x{item.count}
+      </div>
+
+      {item.lore && (
+        <div className="absolute top-2 left-2 z-20 text-indigo-500 bg-indigo-50 p-1 rounded-full shadow-sm">
+          <FileText className="w-2 h-2" />
+        </div>
+      )}
+      
+      <div className="h-28 w-full flex items-end justify-center mb-1 relative z-10 overflow-hidden">
+        <div className="transform scale-[0.55] origin-bottom group-hover:scale-[0.65] transition-transform duration-300">
+           <QiaoYubing color={item.hex} variant={item.variant || 'default'} pose={item.pose || 'idle'} animate={true} />
+        </div>
+      </div>
+
+      <div className="text-center px-1 relative z-10 w-full">
+        <div className="font-bold text-[10px] text-stone-700 truncate mb-1 w-full">
+          {item.name}
+        </div>
+        <div className={`
+          inline-block text-[8px] font-bold uppercase tracking-wider px-1.5 py-0.5 rounded-md
+          ${config.text} bg-stone-100/50
+        `}>
+          {config.label}
+        </div>
+      </div>
+    </div>
+  );
+};
+
+// -----------------------------------------------------------------------------
+// Component: Detail Modal
+// -----------------------------------------------------------------------------
+const DetailModal = ({ item, onClose, onGenerateLore, isGeneratingLore }) => {
+  if (!item) return null;
+  const config = (item.rarity && RARITY_CONFIG[item.rarity]) ? RARITY_CONFIG[item.rarity] : RARITY_CONFIG.common;
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-stone-900/30 backdrop-blur-md animate-in fade-in duration-200">
+      <div 
+        className="bg-white w-full max-w-[320px] rounded-[32px] shadow-2xl overflow-hidden flex flex-col max-h-[85vh] relative animate-in zoom-in-95 duration-200"
+        onClick={(e) => e.stopPropagation()}
+      >
+         <button onClick={onClose} className="absolute top-4 right-4 p-2 bg-stone-100 hover:bg-stone-200 rounded-full z-10 transition-colors">
+           <X className="w-5 h-5 text-stone-500" />
+         </button>
+
+         <div className="flex flex-col h-full overflow-y-auto no-scrollbar">
+           <div className={`relative h-60 flex-shrink-0 flex items-center justify-center bg-gradient-to-b from-white to-stone-50`}>
+             <div className="absolute inset-0 opacity-10" style={{ backgroundImage: 'radial-gradient(circle, currentColor 1px, transparent 1px)', backgroundSize: '16px 16px', color: item.hex }}></div>
+             <div className="transform scale-125 translate-y-4">
+                <QiaoYubing color={item.hex} variant={item.variant || 'default'} pose={item.pose || 'idle'} animate={true} />
+             </div>
+           </div>
+
+           <div className="p-5 flex-1 flex flex-col gap-4 bg-white">
+             <div className="text-center">
+                <h2 className="text-xl font-black text-stone-800 mb-1">{item.name}</h2>
+                <div className="flex items-center justify-center gap-2">
+                  <span className={`text-[10px] font-bold uppercase tracking-widest px-2 py-1 rounded-md ${config.bg} ${config.text} border ${config.border}`}>
+                    {config.label}
+                  </span>
+                  {item.pose && <span className="text-[10px] font-bold text-stone-400 bg-stone-100 px-2 py-1 rounded-md uppercase">POSE: {item.pose}</span>}
+                </div>
+             </div>
+
+             <div className="flex gap-2 text-center">
+                <div className="flex-1 bg-stone-50 p-2 rounded-2xl border border-stone-100">
+                   <div className="text-[10px] text-stone-400 font-bold uppercase">拥有数量</div>
+                   <div className="text-lg font-black text-stone-800">{item.count}</div>
+                </div>
+                <div className="flex-1 bg-stone-50 p-2 rounded-2xl border border-stone-100">
+                   <div className="text-[10px] text-stone-400 font-bold uppercase">初次相遇</div>
+                   <div className="text-xs font-bold text-stone-800 mt-1">{item.pulledAt || 'Unknown'}</div>
+                </div>
+             </div>
+
+             <div className="bg-indigo-50/50 rounded-2xl p-4 border border-indigo-100/50">
+                <div className="flex items-center gap-2 mb-3">
+                  <Sparkles className="w-4 h-4 text-indigo-500" />
+                  <h3 className="font-bold text-stone-700 text-xs">AI 档案</h3>
+                </div>
+
+                {item.lore ? (
+                  <div className="space-y-3 animate-in fade-in">
+                    <div className="flex flex-wrap gap-1.5">
+                       {item.lore.personality && typeof item.lore.personality === 'string' && item.lore.personality.split(' ').map((tag, i) => (
+                         <span key={i} className="text-[10px] font-bold text-indigo-600 bg-white px-2 py-1 rounded border border-indigo-100 shadow-sm">{tag}</span>
+                       ))}
+                    </div>
+                    <p className="text-xs text-stone-600 bg-white p-2 rounded-xl border border-stone-100 italic">“{String(item.lore.quote)}”</p>
+                  </div>
+                ) : (
+                  <button 
+                    onClick={onGenerateLore}
+                    disabled={isGeneratingLore}
+                    className="w-full bg-white text-stone-800 font-bold py-2 rounded-xl border border-stone-200 shadow-sm hover:shadow hover:border-indigo-200 transition-all flex items-center justify-center gap-2 text-xs"
+                  >
+                    {isGeneratingLore ? <RotateCcw className="w-3 h-3 animate-spin" /> : <BrainCircuit className="w-3 h-3" />}
+                    生成性格档案
+                  </button>
+                )}
+             </div>
+           </div>
+         </div>
+      </div>
+    </div>
+  );
+};
+
+// -----------------------------------------------------------------------------
+// Component: The Shop
+// -----------------------------------------------------------------------------
+const DespairShop = ({ isOpen, onClose, onBuyLength, onTenBuyLength, inventory }) => {
+  if (!isOpen) return null;
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center p-6 bg-black/80 backdrop-blur-md animate-in fade-in duration-300">
+      <div className="bg-stone-900 w-full max-w-sm rounded-3xl p-6 border border-stone-700 shadow-2xl relative">
+        <button onClick={onClose} className="absolute top-4 right-4 text-stone-500 hover:text-white"><X className="w-5 h-5" /></button>
+        
+        <div className="flex flex-col items-center mb-6">
+          <div className="w-16 h-16 bg-red-900/30 rounded-full flex items-center justify-center mb-3 border border-red-900/50 animate-pulse">
+            <Store className="w-8 h-8 text-red-500" />
+          </div>
+          <h2 className="text-2xl font-black text-white">绝境黑市</h2>
+          <p className="text-stone-400 text-xs mt-1">随机销毁库存换取长度...</p>
+        </div>
+
+        <div className="bg-black/50 p-4 rounded-xl border border-stone-800 mb-4">
+          <div className="flex items-center justify-between mb-2">
+            <span className="text-stone-300 font-bold text-sm">零星交易 (+1cm)</span>
+            <span className="text-green-400 font-black">+1 CM</span>
+          </div>
+          <div className="text-xs text-stone-500 mb-3">代价：<span className="text-red-400">随机销毁 1 个</span></div>
+          <button 
+            onClick={onBuyLength}
+            disabled={inventory <= 0}
+            className="w-full bg-stone-800 hover:bg-stone-700 text-white font-bold py-3 rounded-lg border border-stone-700 active:scale-95 transition-all flex items-center justify-center gap-2 disabled:opacity-50"
+          >
+            <Trash2 className="w-4 h-4" /> 交易
+          </button>
+        </div>
+
+        <div className="bg-black/50 p-4 rounded-xl border border-red-900/30 mb-2 relative overflow-hidden group">
+          <div className="absolute inset-0 bg-red-900/10 group-hover:bg-red-900/20 transition-colors"></div>
+          <div className="flex items-center justify-between mb-2 relative z-10">
+            <span className="text-red-200 font-bold text-sm">批量粉碎 (+10cm)</span>
+            <span className="text-green-400 font-black">+10 CM</span>
+          </div>
+          <div className="text-xs text-stone-500 mb-3 relative z-10">代价：<span className="text-red-400 font-bold">随机销毁 10 个</span></div>
+          <button 
+            onClick={onTenBuyLength}
+            disabled={inventory < 10}
+            className="w-full relative z-10 bg-red-700 hover:bg-red-600 text-white font-black py-3 rounded-lg shadow-lg shadow-red-900/30 active:scale-95 transition-all flex items-center justify-center gap-2 disabled:opacity-50"
+          >
+            <Flame className="w-4 h-4" /> 确认粉碎
+          </button>
+        </div>
+
+      </div>
+    </div>
+  );
+}
+
+// -----------------------------------------------------------------------------
+// Main Application Component
+// -----------------------------------------------------------------------------
+export default function App() {
+  const [collectionMap, setCollectionMap] = useState({});
+  const [userLength, setUserLength] = useState(8); 
+  const [wangLength, setWangLength] = useState(18); 
+  const [totalPulls, setTotalPulls] = useState(0);
+  
+  const [isSpinning, setIsSpinning] = useState(false);
+  const [currentPull, setCurrentPull] = useState(null);
+  const [effectType, setEffectType] = useState(null);
+  const [selectedItem, setSelectedItem] = useState(null);
+  const [isGeneratingLore, setIsGeneratingLore] = useState(false);
+  const [showShop, setShowShop] = useState(false);
+
+  // Use v13_2 key
+  useEffect(() => {
+    const savedCollection = localStorage.getItem('qiaoCollectionMap_v13_2');
+    const savedUserStats = localStorage.getItem('qiaoUserStats_v13_2');
+    
+    if (savedCollection) {
+      try {
+        const parsed = JSON.parse(savedCollection);
+        if (parsed && typeof parsed === 'object') setCollectionMap(parsed);
+      } catch (e) {}
+    }
+    if (savedUserStats) {
+      try {
+        const stats = JSON.parse(savedUserStats);
+        if (stats) {
+          setUserLength(stats.userLength ?? 8);
+          setWangLength(stats.wangLength ?? 18);
+          setTotalPulls(stats.totalPulls ?? 0);
+        }
+      } catch (e) {}
+    }
+  }, []);
+
+  useEffect(() => {
+    localStorage.setItem('qiaoCollectionMap_v13_2', JSON.stringify(collectionMap));
+    localStorage.setItem('qiaoUserStats_v13_2', JSON.stringify({ userLength, wangLength, totalPulls }));
+  }, [collectionMap, userLength, wangLength, totalPulls]);
+
+  const stats = useMemo(() => {
+    const keys = Object.keys(collectionMap);
+    const collectedCount = keys.length;
+    const totalInventory = Object.values(collectionMap).reduce((acc, item) => acc + (item?.count || 0), 0);
+    return { collectedCount, totalCount: TOTAL_STYLES_COUNT, progress: Math.round((collectedCount / TOTAL_STYLES_COUNT) * 100), totalInventory };
+  }, [collectionMap]);
+
+  const generateRandomItem = (totalPullsCount, currentWangLength, currentCollection) => {
+    const rand = Math.random() * 100;
+    
+    // Wang Ge Logic
+    const wangGeProb = totalPullsCount > 100000 ? 10.0 : 0.0000001;
+    if (rand < wangGeProb) return SPECIAL_STYLES.WANG_GE;
+
+    // Boss Cool Logic (Unique Check)
+    // Only if not owned
+    if (!currentCollection['boss_cool'] && currentWangLength > 100 && rand < 0.8) return SPECIAL_STYLES.BOSS_COOL;
+
+    // God Styles
+    const godKeys = Object.keys(GOD_STYLES);
+    if (rand < 1.5) return GOD_STYLES[godKeys[Math.floor(Math.random() * godKeys.length)]];
+
+    const ultimates = Object.values(ULTIMATE_STYLES);
+    if (rand < 0.1) return ultimates[Math.floor(Math.random() * ultimates.length)]; 
+
+    if (rand < 6.0) {
+        const specials = Object.values(SPECIAL_STYLES).filter(s => s.id !== 'wang_ge' && s.id !== 'boss_cool');
+        return specials[Math.floor(Math.random() * specials.length)];
+    }
+    
+    const palette = PALETTES[Math.floor(Math.random() * PALETTES.length)];
+    const randomPose = POSES[Math.floor(Math.random() * POSES.length)];
+    
+    if (!palette) return { ...SPECIAL_STYLES.CLASSIC, rarity: 'common' };
+
+    return { ...palette, rarity: 'common', pose: randomPose };
+  };
+
+  const getItemId = (item) => {
+    if (!item) return 'unknown';
+    return item.rarity === 'common' ? `${item.id}_${item.pose}` : item.id;
+  };
+
+  const handlePullResult = (item, currentInventoryCount) => {
+    if (item.id === 'wang_ge') {
+        const gain = currentInventoryCount + 10; 
+        setWangLength(w => w + gain);
+        alert(`⚠️ 警告！王哥降临！\n\n场上所有乔宇冰已被分解。\n王哥的长度增加了 ${gain}cm！`);
+        return 'wipe';
+    }
+    if (item.rarity === 'ultimate' || item.rarity === 'supreme') {
+      setUserLength(l => l + 5);
+    }
+    return 'normal';
+  };
+
+  const handleSingleSpin = () => {
+    if (isSpinning) return;
+    setIsSpinning(true);
+    setCurrentPull(null);
+    setEffectType(null);
+
+    setTimeout(() => {
+      const newItem = generateRandomItem(totalPulls, wangLength, collectionMap);
+      const action = handlePullResult(newItem, stats.totalInventory);
+      
+      const itemId = getItemId(newItem);
+      const pulledItem = { ...newItem, id: itemId, pulledAt: new Date().toLocaleTimeString([], {hour:'2-digit', minute:'2-digit'}) };
+      
+      setTotalPulls(p => p + 1);
+      
+      setCollectionMap(prev => {
+        if (action === 'wipe') {
+            return { [itemId]: { ...pulledItem, count: 1 } };
+        }
+        const next = { ...prev };
+        if (next[itemId]) {
+          next[itemId] = { ...next[itemId], count: next[itemId].count + 1, pulledAt: pulledItem.pulledAt };
+        } else {
+          next[itemId] = { ...pulledItem, count: 1 };
+        }
+        return next;
+      });
+
+      setCurrentPull(pulledItem);
+      setEffectType(pulledItem.variant || (pulledItem.rarity === 'legendary' ? 'flash' : null));
+      setIsSpinning(false);
+    }, 1200);
+  };
+
+  // TRIGGER WANG GE DIRECTLY (God Button)
+  const triggerWangGe = () => {
+     if (isSpinning) return;
+     setIsSpinning(true);
+     setEffectType('tenpull');
+     
+     setTimeout(() => {
+        const wangGe = SPECIAL_STYLES.WANG_GE;
+        const gain = stats.totalInventory + 10;
+        setWangLength(w => w + gain);
+        alert(`⚡️ 召唤成功！王哥已降临！\n\n所有乔宇冰已被吞噬。\n王哥长度暴涨 ${gain}cm！`);
+        
+        const pulledItem = { ...wangGe, id: 'wang_ge', count: 1, pulledAt: new Date().toLocaleTimeString([], {hour:'2-digit', minute:'2-digit'}) };
+        setCollectionMap({ 'wang_ge': pulledItem });
+        
+        setCurrentPull(pulledItem);
+        setIsSpinning(false);
+        setEffectType('gold');
+     }, 2000);
+  };
+
+  const handleMultiPull = (count, cost) => {
+    if (isSpinning) return;
+    
+    if (userLength <= 0) {
+      setShowShop(true);
+      return;
+    }
+
+    setIsSpinning(true);
+    setEffectType('tenpull');
+
+    setUserLength(l => Math.max(0, l - cost));
+    setWangLength(l => l + cost);
+    setTotalPulls(p => p + count);
+
+    setTimeout(() => {
+        const newItems = [];
+        // Track if we pull boss cool in this batch to prevent duplicate in same batch
+        let localHasBossCool = !!collectionMap['boss_cool'];
+
+        for(let i=0; i<count; i++) {
+            const item = generateRandomItem(totalPulls + i, wangLength, { ...collectionMap, 'boss_cool': localHasBossCool ? true : undefined });
+            if (item) {
+                newItems.push(item);
+                if (item.id === 'boss_cool') localHasBossCool = true;
+            }
+        }
+        
+        const wangGe = newItems.find(i => i.id === 'wang_ge');
+        
+        if (wangGe) {
+            const gain = stats.totalInventory + 10;
+            setWangLength(w => w + gain);
+            alert(`⚠️ 警告！王哥降临！\n\n场上所有乔宇冰已被分解。\n王哥的长度增加了 ${gain}cm！`);
+            
+            setCollectionMap({ 
+                [wangGe.id]: { 
+                    ...wangGe, 
+                    id: 'wang_ge', 
+                    count: 1, 
+                    pulledAt: new Date().toLocaleTimeString([], {hour:'2-digit', minute:'2-digit'}) 
+                } 
+            });
+            setCurrentPull(wangGe);
+            setIsSpinning(false);
+            setEffectType('gold');
+            return;
+        }
+
+        setCollectionMap(prev => {
+            const next = { ...prev };
+            newItems.forEach(item => {
+                const itemId = getItemId(item);
+                if (next[itemId]) {
+                    next[itemId] = { ...next[itemId], count: next[itemId].count + 1 };
+                } else {
+                    next[itemId] = { ...item, id: itemId, count: 1, pulledAt: new Date().toLocaleTimeString([], {hour:'2-digit', minute:'2-digit'}) };
+                }
+            });
+            return next;
+        });
+          
+        const sortedByRarity = [...newItems].sort((a,b) => {
+            const rarityScore = { supreme: 7, ultimate: 6, god: 5, mythic: 4, hidden: 3, legendary: 2, rare: 1, common: 0 };
+            return rarityScore[b.rarity] - rarityScore[a.rarity];
+        });
+        
+        setCurrentPull(sortedByRarity[0] || SPECIAL_STYLES.CLASSIC);
+        setIsSpinning(false);
+        setEffectType('gold'); 
+    }, 1500);
+  };
+
+  const executeBuy = (costCount, gainLength) => {
+    const keys = Object.keys(collectionMap);
+    if (keys.length < costCount) {
+      alert(`库存不足！需要至少 ${costCount} 个乔宇冰。`);
+      return;
+    }
+
+    setCollectionMap(prev => {
+      const next = { ...prev };
+      for (let i = 0; i < costCount; i++) {
+         const currentKeys = Object.keys(next);
+         if (currentKeys.length === 0) break;
+         const randomKey = currentKeys[Math.floor(Math.random() * currentKeys.length)];
+         
+         if (next[randomKey].count > 1) {
+           next[randomKey] = { ...next[randomKey], count: next[randomKey].count - 1 };
+         } else {
+           delete next[randomKey];
+         }
+      }
+      return next;
+    });
+
+    setUserLength(l => l + gainLength);
+  };
+
+  const handleBuyLength = () => executeBuy(1, 1);
+  const handleTenBuyLength = () => executeBuy(10, 10);
+
+  const handleLoreGen = async () => {
+    if (!selectedItem || isGeneratingLore) return;
+    setIsGeneratingLore(true);
+    const lore = await generateCharacterLore(selectedItem);
+    setCollectionMap(prev => ({ ...prev, [selectedItem.id]: { ...prev[selectedItem.id], lore } }));
+    setSelectedItem(prev => ({ ...prev, lore }));
+    setIsGeneratingLore(false);
+  };
+
+  const clearData = () => {
+    if (confirm("确定要重置所有数据吗？")) {
+      setCollectionMap({});
+      setUserLength(8);
+      setWangLength(18);
+      setTotalPulls(0);
+      setCurrentPull(null);
+    }
+  };
+
+  return (
+    <div className="h-screen bg-[#fff1f2] font-sans text-stone-800 flex flex-col lg:flex-row relative selection:bg-rose-300 selection:text-white overflow-hidden">
+      
+      {/* GOD BUTTON (Hidden Top Right) */}
+      <button onClick={triggerWangGe} className="absolute top-0 right-0 w-16 h-16 z-50 opacity-0 cursor-default"></button>
+
+      <DespairShop 
+        isOpen={showShop} 
+        onClose={() => setShowShop(false)} 
+        onBuyLength={handleBuyLength} 
+        onTenBuyLength={handleTenBuyLength}
+        inventory={stats.totalInventory} 
+      />
+
+      <div className="absolute top-0 left-0 w-full h-full overflow-hidden pointer-events-none opacity-40">
+        <div className="absolute top-10 left-10 text-rose-200 animate-float"><Ghost className="w-12 h-12" /></div>
+        <div className="absolute bottom-20 right-20 text-indigo-200 animate-bounce-gentle"><Sparkles className="w-16 h-16" /></div>
+      </div>
+
+      {selectedItem && <DetailModal item={selectedItem} onClose={() => setSelectedItem(null)} onGenerateLore={handleLoreGen} isGeneratingLore={isGeneratingLore} />}
+
+      <div className="w-full lg:w-5/12 h-full flex flex-col items-center justify-center relative z-10 lg:border-r border-rose-100 bg-[#fff1f2]/80 backdrop-blur-sm shadow-xl lg:shadow-none overflow-y-auto lg:overflow-visible py-8 lg:py-0 shrink-0">
+        
+        <div className="w-full max-w-[320px] bg-white/60 backdrop-blur-md rounded-2xl p-4 mb-6 border border-white shadow-sm flex items-center justify-between">
+           <div className="text-center">
+             <div className="text-[10px] font-bold text-stone-400 uppercase tracking-wider">你的长度</div>
+             <div className={`text-2xl font-black transition-all duration-500 ${userLength <= 0 ? 'text-red-500 animate-pulse' : 'text-stone-700'}`}>{userLength}<span className="text-sm font-normal text-stone-400">cm</span></div>
+           </div>
+           <div className="text-stone-300 flex flex-col items-center">
+             <RotateCcw className="w-4 h-4 rotate-90 mb-1" />
+             <span className="text-[9px] font-bold text-stone-300">{totalPulls}抽</span>
+           </div>
+           <div className="text-center">
+             <div className="text-[10px] font-bold text-stone-400 uppercase tracking-wider">王哥长度</div>
+             <div className="text-2xl font-black text-rose-500 transition-all duration-500">{wangLength}<span className="text-sm font-normal text-stone-400">cm</span></div>
+           </div>
+        </div>
+
+        <div className="text-center mb-8">
+           <h1 className="text-4xl lg:text-5xl font-black text-stone-800 tracking-tighter drop-shadow-sm">
+             <span className="text-rose-400">乔宇冰盲盒</span>
+           </h1>
+           <p className="text-xs font-bold text-stone-400 tracking-[0.2em] mt-1">GOD MODE V13.0</p>
+        </div>
+
+        <div className={`relative group w-[280px] h-[340px] bg-white rounded-[40px] shadow-[0_20px_60px_-15px_rgba(251,113,133,0.3)] border-[8px] border-white flex items-center justify-center mb-8 transition-transform duration-300 hover:scale-[1.02] ${isSpinning ? 'animate-bounce-fast' : ''}`}>
+           <div className={`absolute inset-0 rounded-[32px] overflow-hidden transition-colors duration-500 ${effectType === 'flash' ? 'bg-yellow-100' : effectType === 'galaxy' ? 'bg-indigo-900' : 'bg-stone-50'}`}>
+             <div className="absolute inset-0 opacity-10" style={{backgroundImage: 'radial-gradient(#fb7185 2px, transparent 2px)', backgroundSize: '20px 20px'}}></div>
+           </div>
+
+           {isSpinning ? (
+             <div className="relative z-10 flex flex-col items-center">
+                <Dna className="w-12 h-12 text-rose-300 animate-spin" />
+                <span className="text-xs font-black text-rose-300 mt-2 tracking-widest">制造中...</span>
+             </div>
+           ) : currentPull ? (
+             <div className="relative z-10 flex flex-col items-center animate-in zoom-in-75 duration-300 spring-bounce">
+                <div className="transform scale-150 mb-4 drop-shadow-lg">
+                   <QiaoYubing color={currentPull.hex} variant={currentPull.variant || 'default'} pose={currentPull.pose || 'idle'} animate={true} />
+                </div>
+                <div className="bg-white/80 backdrop-blur px-4 py-1.5 rounded-full shadow-sm border border-stone-100 flex flex-col items-center max-w-[240px]">
+                   <span className="text-xs font-black text-stone-700 truncate">{currentPull.name}</span>
+                   {currentPull.rarity === 'supreme' && <span className="text-[9px] text-red-600 font-black uppercase tracking-wider animate-pulse">☠️ 灭世魔神 ☠️</span>}
+                   {currentPull.rarity === 'ultimate' && <span className="text-[9px] text-transparent bg-clip-text bg-gradient-to-r from-red-500 to-yellow-500 font-bold uppercase tracking-wider animate-pulse">ULTIMATE PULL!</span>}
+                </div>
+             </div>
+           ) : (
+             <div className="relative z-10 text-center opacity-40">
+                <ShieldQuestion className="w-16 h-16 text-stone-300 mx-auto mb-2" />
+                <p className="text-xs font-bold text-stone-400">点击抽盒</p>
+             </div>
+           )}
+        </div>
+
+        <div className="w-full max-w-[320px] grid grid-cols-2 gap-3">
+          <button 
+            onClick={handleSingleSpin}
+            disabled={isSpinning}
+            className="col-span-2 w-full bg-stone-900 text-white font-black py-4 rounded-2xl shadow-lg hover:bg-stone-800 hover:scale-[1.02] active:scale-95 transition-all disabled:opacity-50 disabled:cursor-not-allowed"
+          >
+            {isSpinning ? '生成中...' : '单抽 (免费)'}
+          </button>
+
+          {totalPulls >= 5 ? (
+             <button 
+               onClick={() => handleMultiPull(10, 1)}
+               disabled={isSpinning}
+               className={`col-span-2 group w-full font-black py-4 rounded-2xl shadow-lg hover:scale-[1.02] active:scale-95 transition-all disabled:opacity-50 flex items-center justify-center gap-2 relative overflow-hidden
+                 ${userLength <= 0 ? 'bg-black text-red-500 hover:shadow-red-900/50' : 'bg-gradient-to-r from-rose-400 to-orange-400 text-white hover:shadow-orange-200'}
+               `}
+             >
+               <span className="relative z-10 flex items-center gap-1 text-sm">
+                 {userLength <= 0 ? <AlertTriangle className="w-4 h-4" /> : <Ruler className="w-4 h-4" />}
+                 {userLength <= 0 ? '长度归零 (开启黑市)' : '十连抽 (-1cm)'}
+               </span>
+               <div className="absolute inset-0 bg-white/20 translate-y-full group-hover:translate-y-0 transition-transform duration-300"></div>
+             </button>
+          ) : (
+             <div className="col-span-2 w-full py-3 bg-stone-100 rounded-2xl text-center border border-stone-200">
+               <p className="text-[10px] font-bold text-stone-400 uppercase tracking-wider">解锁十连 ({totalPulls}/5)</p>
+               <div className="w-32 h-1.5 bg-stone-200 rounded-full mx-auto mt-1.5 overflow-hidden">
+                 <div className="h-full bg-stone-400 transition-all duration-500" style={{width: `${Math.min(100, (totalPulls/5)*100)}%`}}></div>
+               </div>
+             </div>
+          )}
+
+          {totalPulls >= 100 && (
+             <button 
+               onClick={() => handleMultiPull(100, 3)}
+               disabled={isSpinning}
+               className="bg-indigo-600 text-white font-bold py-3 rounded-2xl shadow-lg hover:bg-indigo-700 active:scale-95 transition-all disabled:opacity-50 text-xs flex flex-col items-center justify-center"
+             >
+               <span className="text-lg font-black">100连</span>
+               <span>-3cm</span>
+             </button>
+          )}
+
+          {totalPulls >= 3000 && (
+             <button 
+               onClick={() => handleMultiPull(1000, 10)}
+               disabled={isSpinning}
+               className="bg-purple-600 text-white font-bold py-3 rounded-2xl shadow-lg hover:bg-purple-700 active:scale-95 transition-all disabled:opacity-50 text-xs flex flex-col items-center justify-center"
+             >
+               <div className="flex items-center gap-1"><Rocket className="w-3 h-3" /> <span className="text-lg font-black">1000连</span></div>
+               <span>-10cm</span>
+             </button>
+          )}
+        </div>
+
+      </div>
+
+      <div className="w-full lg:w-7/12 bg-white/50 backdrop-blur-sm p-6 lg:p-10 h-full overflow-y-auto no-scrollbar rounded-t-[40px] lg:rounded-none lg:border-l border-white/50">
+         <div className="flex justify-between items-end mb-6">
+            <div>
+               <h2 className="text-xl font-black text-stone-800 flex items-center gap-2">
+                 我的图鉴 <span className="bg-stone-200 text-[10px] px-2 py-0.5 rounded-full text-stone-500">COLLECTION</span>
+               </h2>
+               <div className="text-xs font-bold text-stone-400 mt-1 flex items-center gap-2">
+                 <span>已集齐 {stats.collectedCount} / {stats.totalCount}</span>
+                 <span className="text-rose-400 bg-rose-50 px-1.5 py-0.5 rounded border border-rose-100">缺 {stats.totalCount - stats.collectedCount} 款</span>
+               </div>
+            </div>
+            <button onClick={clearData} className="p-2 hover:bg-rose-50 text-stone-300 hover:text-rose-400 rounded-xl transition-colors">
+               <Trash2 className="w-4 h-4" />
+            </button>
+         </div>
+
+         {stats.collectedCount === 0 ? (
+            <div className="h-64 flex flex-col items-center justify-center text-stone-300 border-2 border-dashed border-stone-200 rounded-3xl">
+               <Ghost className="w-10 h-10 mb-2 opacity-50" />
+               <p className="text-sm font-bold">空空如也</p>
+            </div>
+         ) : (
+           <div className="grid grid-cols-4 sm:grid-cols-5 lg:grid-cols-5 xl:grid-cols-6 gap-2 pb-24">
+             {[...Object.values(collectionMap)].sort((a,b) => {
+                const score = { supreme: 8, ultimate: 6, god: 5, mythic: 4, hidden: 3, legendary: 2, rare: 1, common: 0 };
+                return (score[b.rarity] - score[a.rarity]) || b.pulledAt.localeCompare(a.pulledAt);
+             }).map(item => (
+                <CollectionItem key={item.id} item={item} onClick={setSelectedItem} />
+             ))}
+           </div>
+         )}
+      </div>
+
+    </div>
+  );
+}
+
+const style = document.createElement('style');
+style.textContent = `
+  @keyframes float { 0%, 100% { transform: translateY(0); } 50% { transform: translateY(-5px); } }
+  .animate-float { animation: float 3s infinite ease-in-out; }
+  
+  @keyframes bounce-gentle { 0%, 100% { transform: translateY(0); } 50% { transform: translateY(-3px); } }
+  .animate-bounce-gentle { animation: bounce-gentle 2s infinite ease-in-out; }
+
+  @keyframes bounce-fast { 0%, 100% { transform: translateY(0); } 50% { transform: translateY(-3px) rotate(2deg); } }
+  .animate-bounce-fast { animation: bounce-fast 0.15s infinite; }
+
+  @keyframes spin-slow { from { transform: rotate(0deg); } to { transform: rotate(360deg); } }
+  .animate-spin-slow { animation: spin-slow 3s infinite linear; }
+
+  @keyframes pulse-slow { 0%, 100% { transform: scale(1); filter: brightness(1); } 50% { transform: scale(1.02); filter: brightness(1.05); } }
+  .animate-pulse-slow { animation: pulse-slow 3s infinite ease-in-out; }
+
+  @keyframes sway { 0%, 100% { transform: rotate(-2deg); } 50% { transform: rotate(2deg); } }
+  .animate-sway { animation: sway 1s infinite ease-in-out; }
+  
+  @keyframes sway-slow { 0%, 100% { transform: rotate(-1deg); } 50% { transform: rotate(1deg); } }
+  .animate-sway-slow { animation: sway-slow 3s infinite ease-in-out; }
+
+  @keyframes wiggle { 0%, 100% { transform: rotate(-3deg); } 50% { transform: rotate(3deg); } }
+  .animate-wiggle { animation: wiggle 0.5s infinite ease-in-out; }
+
+  @keyframes breathe { 0%, 100% { transform: scale(1); } 50% { transform: scale(1.05); } }
+  .animate-breathe { animation: breathe 3s infinite ease-in-out; }
+
+  @keyframes shake-hard { 0%, 100% { transform: translateX(0); } 25% { transform: translateX(-2px) rotate(-1deg); } 75% { transform: translateX(2px) rotate(1deg); } }
+  .animate-shake-hard { animation: shake-hard 0.1s infinite; }
+
+  @keyframes shake-vertical { 0%, 100% { transform: translateY(0); } 25% { transform: translateY(-3px); } 75% { transform: translateY(3px); } }
+  .animate-shake-vertical { animation: shake-vertical 0.15s infinite; }
+
+  .spring-bounce { animation: spring 0.6s cubic-bezier(0.175, 0.885, 0.32, 1.275); }
+  @keyframes spring { from { transform: scale(0); opacity: 0; } to { transform: scale(1); opacity: 1; } }
+
+  .no-scrollbar::-webkit-scrollbar { display: none; }
+  .no-scrollbar { -ms-overflow-style: none; scrollbar-width: none; }
+`;
+document.head.appendChild(style);
