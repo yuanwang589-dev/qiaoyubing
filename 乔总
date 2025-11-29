@@ -270,7 +270,7 @@ const QiaoYubing = ({ color, variant = 'default', pose = 'idle', scale = 1, anim
   }
 
   // --- Specific Style Overrides ---
-  if (isWangGe || isBossCool) { bodyColor = '#020617'; faceColor = '#e2e8f0'; hairColor = '#000'; shoulderColor = '#991b1b'; mouthColor = '#ef4444'; blushOpacity = 0; }
+  if (isWangGe) { bodyColor = '#020617'; faceColor = '#e2e8f0'; hairColor = '#000'; shoulderColor = '#991b1b'; mouthColor = '#ef4444'; blushOpacity = 0; }
   if (isWocIce) { bodyColor = '#bae6fd'; faceColor = '#e0f2fe'; blushOpacity = 0.8; mouthColor = '#0ea5e9'; }
   if (isAngry || isGodRush) { bodyColor = '#ef4444'; faceColor = '#fca5a5'; blushOpacity = 0; }
   if (isStock || isPepe || isGodNtr) { bodyColor = '#22c55e'; faceColor = '#dcfce7'; mouthColor = '#15803d'; }
@@ -399,7 +399,7 @@ const QiaoYubing = ({ color, variant = 'default', pose = 'idle', scale = 1, anim
     else if (pose === 'walk' || isZombie) animClass = 'animate-sway';
     else if (isStock) animClass = 'animate-pulse';
     else if (isPokemon) animClass = 'animate-bounce-gentle';
-    else if (isUltimate || isBossCool) animClass = 'animate-pulse-slow';
+    else if (isUltimate) animClass = 'animate-pulse-slow';
     else if (pose === 'cheer' || pose === 'jump') animClass = 'animate-bounce-gentle';
     else animClass = ['animate-breathe', 'animate-sway-slow', 'animate-wiggle'][Math.floor(Math.random() * 3)];
   }
@@ -410,13 +410,13 @@ const QiaoYubing = ({ color, variant = 'default', pose = 'idle', scale = 1, anim
       style={{ transform: `scale(${scale})`, opacity }}
     >
       {isGalaxy && <div className="absolute inset-0 bg-transparent z-20 pointer-events-none"><Sparkles className="absolute top-0 left-2 w-3 h-3 text-white animate-pulse" /></div>}
-      {(isGold || isUltimate || isBossCool || isGodLuck) && <div className="absolute -top-4 -right-4 w-5 h-5 text-yellow-400 animate-spin-slow"><Star fill="currentColor" /></div>}
+      {(isGold || isUltimate || isGodLuck) && <div className="absolute -top-4 -right-4 w-5 h-5 text-yellow-400 animate-spin-slow"><Star fill="currentColor" /></div>}
       {isClassic && <div className="absolute -inset-10 bg-yellow-400/10 blur-xl rounded-full z-0 animate-pulse-slow"></div>}
       {isStock && <div className="absolute inset-0 z-0 opacity-30"><TrendingDown className="w-10 h-10 text-green-600 absolute top-0 right-0 animate-bounce" /></div>}
       {(isPokemon || isMinion) && <div className="absolute -top-6 right-0 z-20"><Zap className="w-6 h-6 text-yellow-500 animate-ping" /></div>}
       {isOtaku && <div className="absolute bottom-20 right-10 z-20"><div className="bg-white border border-stone-200 rounded w-5 h-4 shadow-sm relative"><div className="absolute -top-2 left-1/2 -translate-x-1/2 w-3 h-3 bg-white rotate-45 rounded-sm"></div></div></div>}
       {isWocIce && <div className="absolute top-0 right-0 text-cyan-500 font-black animate-bounce">WOC! ❄️</div>}
-      {(isWangGe || isBossCool) && <div className="absolute -inset-10 bg-red-900/30 blur-2xl rounded-full z-0 animate-pulse"></div>}
+      {isWangGe && <div className="absolute -inset-10 bg-red-900/30 blur-2xl rounded-full z-0 animate-pulse"></div>}
       {isAngel && <div className="absolute -top-8 left-1/2 -translate-x-1/2 w-12 h-4 border-4 border-yellow-200 rounded-[50%] animate-float"></div>}
       {isBsod && <div className="absolute top-10 left-4 text-[6px] text-white font-mono opacity-50">:( <br/>FATAL<br/>ERROR</div>}
       {isSmic && <div className="absolute inset-0 z-20 opacity-30 pointer-events-none"><Cpu className="w-full h-full text-white animate-pulse" /></div>}
@@ -429,8 +429,8 @@ const QiaoYubing = ({ color, variant = 'default', pose = 'idle', scale = 1, anim
         <g transform={`translate(0, ${bodyY})`}>
           {(!isGhost && !isSlime) && (
              <g>
-                <circle cx={leftFootX} cy={leftFootY} r="10" fill={(isWangGe || isBatman || isNinja || isBossCool || isGodKey) ? "#000" : isSpider ? "#ef4444" : "#374151"} />
-                <circle cx={rightFootX} cy={rightFootY} r="10" fill={(isWangGe || isBatman || isNinja || isBossCool || isGodKey) ? "#000" : isSpider ? "#ef4444" : "#374151"} />
+                <circle cx={leftFootX} cy={leftFootY} r="10" fill={(isWangGe || isBatman || isNinja || isGodKey) ? "#000" : isSpider ? "#ef4444" : "#374151"} />
+                <circle cx={rightFootX} cy={rightFootY} r="10" fill={(isWangGe || isBatman || isNinja || isGodKey) ? "#000" : isSpider ? "#ef4444" : "#374151"} />
              </g>
           )}
           {(isGhost || isSlime) && (
@@ -554,7 +554,7 @@ const QiaoYubing = ({ color, variant = 'default', pose = 'idle', scale = 1, anim
                  </g>
               ) : (
                  <g>
-                   {isBatman || isNinja || isGodKey ? (
+                   {isBatman || isNinja ? (
                      <>
                         <path d="M80 45 L90 45 L85 50 Z" fill="white" />
                         <path d="M110 45 L120 45 L115 50 Z" fill="white" />
@@ -589,7 +589,7 @@ const QiaoYubing = ({ color, variant = 'default', pose = 'idle', scale = 1, anim
                  )
               )}
 
-              {isAngry || isWangGe || isBossCool || isJoker ? (
+              {isAngry || isWangGe || isJoker ? (
                 <path d="M92 78 Q100 85 108 78" fill="none" stroke={mouthColor} strokeWidth="2.5" strokeLinecap="round" />
               ) : pose === 'cheer' || isPokemon || isMinion ? (
                  <path d="M94 75 Q100 85 106 75 Z" fill="#374151" />
@@ -813,10 +813,10 @@ export default function App() {
   const [isGeneratingLore, setIsGeneratingLore] = useState(false);
   const [showShop, setShowShop] = useState(false);
 
-  // Use v13_2 key
+  // Use v13_3 key for clean state
   useEffect(() => {
-    const savedCollection = localStorage.getItem('qiaoCollectionMap_v13_2');
-    const savedUserStats = localStorage.getItem('qiaoUserStats_v13_2');
+    const savedCollection = localStorage.getItem('qiaoCollectionMap_v13_3');
+    const savedUserStats = localStorage.getItem('qiaoUserStats_v13_3');
     
     if (savedCollection) {
       try {
@@ -837,8 +837,8 @@ export default function App() {
   }, []);
 
   useEffect(() => {
-    localStorage.setItem('qiaoCollectionMap_v13_2', JSON.stringify(collectionMap));
-    localStorage.setItem('qiaoUserStats_v13_2', JSON.stringify({ userLength, wangLength, totalPulls }));
+    localStorage.setItem('qiaoCollectionMap_v13_3', JSON.stringify(collectionMap));
+    localStorage.setItem('qiaoUserStats_v13_3', JSON.stringify({ userLength, wangLength, totalPulls }));
   }, [collectionMap, userLength, wangLength, totalPulls]);
 
   const stats = useMemo(() => {
@@ -851,26 +851,34 @@ export default function App() {
   const generateRandomItem = (totalPullsCount, currentWangLength, currentCollection) => {
     const rand = Math.random() * 100;
     
-    // Wang Ge Logic
+    // 1. Wang Ge (Absolute Priority)
     const wangGeProb = totalPullsCount > 100000 ? 10.0 : 0.0000001;
     if (rand < wangGeProb) return SPECIAL_STYLES.WANG_GE;
 
-    // Boss Cool Logic (Unique Check)
-    // Only if not owned
-    if (!currentCollection['boss_cool'] && currentWangLength > 100 && rand < 0.8) return SPECIAL_STYLES.BOSS_COOL;
+    // 2. Ultimate (0.1%)
+    if (rand < 0.1) {
+        const ultimates = Object.values(ULTIMATE_STYLES);
+        return ultimates[Math.floor(Math.random() * ultimates.length)]; 
+    }
 
-    // God Styles
-    const godKeys = Object.keys(GOD_STYLES);
-    if (rand < 1.5) return GOD_STYLES[godKeys[Math.floor(Math.random() * godKeys.length)]];
+    // 3. Boss Cool (Unique Check - 0.8%)
+    if (!currentCollection['boss_cool'] && currentWangLength > 100 && rand < 0.8) {
+        return SPECIAL_STYLES.BOSS_COOL;
+    }
 
-    const ultimates = Object.values(ULTIMATE_STYLES);
-    if (rand < 0.1) return ultimates[Math.floor(Math.random() * ultimates.length)]; 
+    // 4. God Styles (1.5%)
+    if (rand < 1.5) {
+        const godKeys = Object.keys(GOD_STYLES);
+        return GOD_STYLES[godKeys[Math.floor(Math.random() * godKeys.length)]];
+    }
 
+    // 5. Specials (6.0%)
     if (rand < 6.0) {
         const specials = Object.values(SPECIAL_STYLES).filter(s => s.id !== 'wang_ge' && s.id !== 'boss_cool');
         return specials[Math.floor(Math.random() * specials.length)];
     }
     
+    // 6. Common
     const palette = PALETTES[Math.floor(Math.random() * PALETTES.length)];
     const randomPose = POSES[Math.floor(Math.random() * POSES.length)];
     
@@ -969,7 +977,6 @@ export default function App() {
 
     setTimeout(() => {
         const newItems = [];
-        // Track if we pull boss cool in this batch to prevent duplicate in same batch
         let localHasBossCool = !!collectionMap['boss_cool'];
 
         for(let i=0; i<count; i++) {
@@ -1000,6 +1007,13 @@ export default function App() {
             setEffectType('gold');
             return;
         }
+
+        // Process Ultimate Bonuses
+        newItems.forEach(item => {
+            if (item.rarity === 'ultimate' || item.rarity === 'supreme') {
+                setUserLength(l => l + 5);
+            }
+        });
 
         setCollectionMap(prev => {
             const next = { ...prev };
@@ -1115,7 +1129,7 @@ export default function App() {
            <h1 className="text-4xl lg:text-5xl font-black text-stone-800 tracking-tighter drop-shadow-sm">
              <span className="text-rose-400">乔宇冰盲盒</span>
            </h1>
-           <p className="text-xs font-bold text-stone-400 tracking-[0.2em] mt-1">GOD MODE V13.0</p>
+           <p className="text-xs font-bold text-stone-400 tracking-[0.2em] mt-1">GOD MODE V13.3</p>
         </div>
 
         <div className={`relative group w-[280px] h-[340px] bg-white rounded-[40px] shadow-[0_20px_60px_-15px_rgba(251,113,133,0.3)] border-[8px] border-white flex items-center justify-center mb-8 transition-transform duration-300 hover:scale-[1.02] ${isSpinning ? 'animate-bounce-fast' : ''}`}>
